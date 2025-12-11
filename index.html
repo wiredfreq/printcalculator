@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Calculator</title>
+    
+    <!-- 1. 리액트와 ReactDOM 불러오기 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 2. JSX를 브라우저가 이해하도록 변환해주는 Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 3. 디자인을 위한 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 4. 폰트 설정 (Pretendard) -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+    <style>
+        /* 기본 폰트 적용 */
+        body, input, select, button, textarea, div {
+            font-family: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif !important;
+        }
+
+        /* 인쇄 설정 */
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background-color: white; }
+            .invoice-container { box-shadow: none !important; border: 1px solid #ddd !important; width: 100% !important; margin: 0 !important; }
+            .page-break { page-break-inside: avoid; }
+            input { border: none !important; background: transparent !important; text-align: right; width: 100%; font-family: inherit; font-size: inherit; }
+            input::placeholder { color: transparent; }
+        }
+
+        /* 수정 가능한 인풋 스타일 */
+        .editable-input {
+            width: 100%;
+            text-align: right;
+            border: 1px dashed #cbd5e1;
+            border-radius: 4px;
+            padding: 4px;
+            font-weight: bold;
+            color: #2563eb;
+            transition: all 0.2s;
+        }
+        .editable-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            background-color: #eff6ff;
+        }
+        @media print {
+            .editable-input { border: none; padding: 0; color: #000; font-weight: normal; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <div id="root"></div>
+
+    <!-- 리액트 코드 시작 -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- 아이콘 컴포넌트 (Lucide 아이콘을 SVG로 직접 구현) ---
+        const Icon = ({ path, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {path}
+            </svg>
+        );
+        const CalculatorIcon = (props) => <Icon {...props} path={<><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></>} />;
+        const RefreshCcw = (props) => <Icon {...props} path={<><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></>} />;
+        const Settings = (props) => <Icon {...props} path={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} />;
+        const Layers = (props) => <Icon {...props} path={<><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>} />;
+        const Book = (props) => <Icon {...props} path={<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>} />;
+        const Scissors = (props) => <Icon {...props} path={<><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></>} />;
+        const Printer = (props) => <Icon {...props} path={<><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></>} />;
+        const FileText = (props) => <Icon {...props} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></>} />;
+        const Info = (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></>} />;
+
+        // --- 메인 컴포넌트 ---
+        const PrintingQuoteCalculator = () => {
+            // --- 상태 관리 ---
+            
+            // 1. 기본 설정 & 사이즈
+            const [sizeMode, setSizeMode] = useState('A4');
+            const [customSize, setCustomSize] = useState({ w: 210, h: 297 }); // mm 단위
+            const [quantity, setQuantity] = useState(500); // 부수
+            const [customerName, setCustomerName] = useState('');
+            const [printMethod, setPrintMethod] = useState('offset'); // digital | offset
+
+            // 2. 표지 설정
+            const [cover, setCover] = useState({
+                use: true, paperType: 'art', paperWeight: '250g', printColor: 'color', printSide: 'single', coating: 'glossy'
+            });
+
+            // 3. 내지 설정
+            const [inner, setInner] = useState({
+                paperType: 'mojo', paperWeight: '100g', printColor: 'bw', printSide: 'double', pages: 48
+            });
+
+            // 4. 후가공
+            const [binding, setBinding] = useState('wireless');
+            const [specialFinish, setSpecialFinish] = useState({ foil: false, emboss: false });
+
+            // 5. 수동 단가 관리 (표지/내지 용지값만 관리)
+            const [manualPrices, setManualPrices] = useState({});
+
+            // --- 가격 상수 ---
+            const PRICES = {
+                paper: {
+                // 1연(R)당 고시 가격 (자동계산 기본값, 사용자가 수정 가능)
+                art: { '100g': 75000, '150g': 95000, '200g': 125000, '250g': 145000, '300g': 170000 },
+                snow: { '100g': 75000, '150g': 95000, '200g': 125000, '250g': 145000, '300g': 170000 },
+                mojo: { '80g': 60000, '100g': 72000, '120g': 85000, '150g': 98000 }, 
+                rendezvous: { '105g': 195000, '130g': 240000, '160g': 290000, '210g': 350000, '240g': 390000 }, 
+                montblanc: { '100g': 185000, '130g': 230000, '160g': 280000, '190g': 330000, '240g': 380000 },
+                van_nouveau: { '100g': 210000, '130g': 250000, '160g': 290000, '210g': 360000, '250g': 410000 }, 
+                tintoretto: { '100g': 270000, '150g': 330000, '200g': 410000, '250g': 480000, '300g': 550000 }, 
+                mermaid: { '100g': 160000, '150g': 220000, '200g': 270000, '250g': 330000 }, 
+                },
+                ctp: { plate: 18000 }, 
+                printRun: { none: 0, bw: 18, color: 45, basic: 40000 }, 
+                coating: { none: 0, glossy: 150, matte: 180 }, 
+                // 스프링 제본 단가 1500원으로 수정
+                binding: { none: 0, saddle: 400, wireless: 900, ring: 1500 }, 
+                special: { copperPlate: 50000, foilWork: 60 },
+            };
+
+            // --- 헬퍼 함수 ---
+            const handlePriceChange = (key, value) => {
+                setManualPrices(prev => ({ ...prev, [key]: Number(value) }));
+            };
+
+            const resetManualPrices = () => {
+                if(window.confirm('수정한 용지 단가를 초기화하시겠습니까?')) {
+                setManualPrices({});
+                }
+            };
+
+            // --- 계산 로직 ---
+            const calculateEstimate = () => {
+                // 1. 사이즈 비율
+                let width = 0, height = 0;
+                if (sizeMode === 'custom') { width = Number(customSize.w); height = Number(customSize.h); }
+                else {
+                switch(sizeMode) {
+                    case 'A4': width = 210; height = 297; break;
+                    case 'A3': width = 297; height = 420; break;
+                    case 'A5': width = 148; height = 210; break;
+                    case 'B5': width = 182; height = 257; break;
+                    default: width = 210; height = 297; 
+                }
+                }
+                const standardArea = 210 * 297;
+                const currentArea = width * height;
+                let sizeMultiplier = currentArea / standardArea;
+                if (sizeMode === 'custom') sizeMultiplier *= 1.1;
+
+                // --- A. 용지 소요량 (R) 계산 ---
+                const calculateReamsWithLoss = (netSheets, sheetsPerReam, isInner = false, totalPages = 0) => {
+                    const netReams = netSheets / sheetsPerReam;
+                    let lossReams = 0;
+
+                    if (printMethod === 'offset') {
+                        const runningLossRate = 0.05; 
+                        if (isInner) {
+                            const baseSetupLoss = 0.2; 
+                            const signatures = Math.ceil(totalPages / 16);
+                            const lossPerSignature = 0.15; 
+                            const signatureLoss = signatures * lossPerSignature;
+                            lossReams = (netReams * runningLossRate) + baseSetupLoss + signatureLoss;
+                        } else {
+                            const coverBaseLoss = 0.15; 
+                            lossReams = (netReams * runningLossRate) + coverBaseLoss;
+                        }
+                    } else {
+                        lossReams = netReams * 0.03;
+                    }
+                    return { net: netReams, loss: lossReams, total: netReams + lossReams };
+                };
+
+                // 표지 R수
+                let coverReamData = { total: 0, net: 0, loss: 0 };
+                if (cover.use) {
+                const sheetsPerReamCover = 2000 / sizeMultiplier; 
+                coverReamData = calculateReamsWithLoss(quantity, sheetsPerReamCover, false);
+                }
+                
+                // 내지 R수
+                let innerReamData = { total: 0, net: 0, loss: 0 };
+                const innerSheetsPerBook = inner.printSide === 'double' ? Math.ceil(inner.pages / 2) : inner.pages;
+                const totalInnerSheets = innerSheetsPerBook * quantity;
+                const sheetsPerReamInner = 4000 / sizeMultiplier;
+                innerReamData = calculateReamsWithLoss(totalInnerSheets, sheetsPerReamInner, true, inner.pages);
+
+
+                // --- B. 단가 자동 산출 & 견적 ---
+                // 1. 용지 연단가 (수정 가능 영역)
+                const defaultCoverPaperPrice = PRICES.paper[cover.paperType]?.[cover.paperWeight] || 0;
+                const defaultInnerPaperPrice = PRICES.paper[inner.paperType]?.[inner.paperWeight] || 0;
+
+                const itemCoverPaper = {
+                    qty: Number(coverReamData.total.toFixed(2)),
+                    unit: 'R(연)',
+                    finalPrice: manualPrices['coverPaper'] ?? defaultCoverPaperPrice,
+                };
+                itemCoverPaper.amount = itemCoverPaper.qty * itemCoverPaper.finalPrice;
+
+                const itemInnerPaper = {
+                    qty: Number(innerReamData.total.toFixed(2)),
+                    unit: 'R(연)',
+                    finalPrice: manualPrices['innerPaper'] ?? defaultInnerPaperPrice,
+                };
+                itemInnerPaper.amount = itemInnerPaper.qty * itemInnerPaper.finalPrice;
+
+                // 2. CTP (수정 불가)
+                const defaultCtpPrice = PRICES.ctp.plate;
+                let ctpQty = 0;
+                if (printMethod === 'offset') {
+                if (cover.use && cover.printColor !== 'none') ctpQty += (cover.printColor === 'color' ? 4 : 1) * (cover.printSide === 'double' ? 2 : 1);
+                if (inner.printColor !== 'none') ctpQty += (inner.printColor === 'color' ? 4 : 1) * (inner.printSide === 'double' ? 2 : 1);
+                } else {
+                ctpQty = 1; 
+                }
+                const itemCtp = {
+                    qty: ctpQty,
+                    unit: printMethod === 'offset' ? '판' : '식',
+                    finalPrice: printMethod === 'offset' ? defaultCtpPrice : 5000,
+                };
+                itemCtp.amount = itemCtp.qty * itemCtp.finalPrice;
+
+                // 3. 인쇄비 (수정 불가)
+                let calcCoverPrintTotal = 0;
+                if (cover.use && cover.printColor !== 'none') {
+                    const unit = cover.printColor === 'color' ? 50000 : 20000; 
+                    const printReams = Math.max(1, coverReamData.total);
+                    calcCoverPrintTotal = Math.max(PRICES.printRun.basic, unit * printReams * (cover.printSide==='double'?2:1)); 
+                }
+                const itemCoverPrint = {
+                    qty: cover.use && cover.printColor !== 'none' ? 1 : 0,
+                    unit: '식',
+                    finalPrice: calcCoverPrintTotal,
+                };
+                itemCoverPrint.amount = itemCoverPrint.qty * itemCoverPrint.finalPrice;
+
+                let calcInnerPrintTotal = 0;
+                if (inner.printColor !== 'none') {
+                    const unit = inner.printColor === 'color' ? 40000 : 15000;
+                    const printReams = Math.max(1, innerReamData.total);
+                    calcInnerPrintTotal = Math.max(PRICES.printRun.basic, unit * printReams * (inner.printSide==='double'?2:1));
+                }
+                const itemInnerPrint = {
+                    qty: inner.printColor !== 'none' ? 1 : 0,
+                    unit: '식',
+                    finalPrice: calcInnerPrintTotal,
+                };
+                itemInnerPrint.amount = itemInnerPrint.qty * itemInnerPrint.finalPrice;
+
+                // 4. 후가공 (수정 불가)
+                const defaultCoatingPrice = (PRICES.coating[cover.coating] || 0) * sizeMultiplier;
+                const itemCoating = {
+                    qty: cover.coating !== 'none' ? quantity : 0,
+                    unit: '부',
+                    finalPrice: defaultCoatingPrice,
+                };
+                itemCoating.amount = itemCoating.qty * itemCoating.finalPrice;
+
+                const defaultBindingPrice = (PRICES.binding[binding] || 0);
+                const itemBinding = {
+                    qty: binding !== 'none' ? quantity : 0,
+                    unit: '부',
+                    finalPrice: defaultBindingPrice,
+                };
+                itemBinding.amount = itemBinding.qty * itemBinding.finalPrice;
+
+                // 5. 특수 (수정 불가)
+                let calcSpecialTotal = 0;
+                if (specialFinish.foil || specialFinish.emboss) {
+                    calcSpecialTotal = PRICES.special.copperPlate + (PRICES.special.foilWork * quantity);
+                }
+                const itemSpecial = {
+                    qty: (specialFinish.foil || specialFinish.emboss) ? 1 : 0,
+                    unit: '식',
+                    finalPrice: calcSpecialTotal,
+                };
+                itemSpecial.amount = itemSpecial.qty * itemSpecial.finalPrice;
+
+
+                // 합계
+                const directCost = itemCoverPaper.amount + itemInnerPaper.amount + itemCtp.amount + 
+                                itemCoverPrint.amount + itemInnerPrint.amount + 
+                                itemCoating.amount + itemBinding.amount + itemSpecial.amount;
+                
+                const generalMgmtFee = directCost * 0.05;
+                const subTotal = directCost + generalMgmtFee;
+                const vat = subTotal * 0.1;
+                const total = subTotal + vat;
+
+                const signatures = Math.ceil(inner.pages / 16);
+
+                return {
+                sizeText: sizeMode === 'custom' ? `${width} x ${height} mm` : sizeMode,
+                items: {
+                    coverPaper: itemCoverPaper,
+                    innerPaper: itemInnerPaper,
+                    ctp: itemCtp,
+                    coverPrint: itemCoverPrint,
+                    innerPrint: itemInnerPrint,
+                    coating: itemCoating,
+                    binding: itemBinding,
+                    special: itemSpecial
+                },
+                reamDetails: {
+                    cover: coverReamData,
+                    inner: innerReamData,
+                    signatures: signatures
+                },
+                generalMgmtFee,
+                subTotal,
+                vat,
+                total
+                };
+            };
+
+            const estimate = calculateEstimate();
+            const formatCurrency = (val) => new Intl.NumberFormat('ko-KR').format(Math.floor(val));
+            const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            const getPaperName = (type) => {
+                switch(type) {
+                case 'art': return '아트지'; case 'snow': return '스노우지'; case 'mojo': return '모조지';
+                case 'rendezvous': return '랑데뷰(삼원)'; case 'montblanc': return '몽블랑(한솔)';
+                case 'van_nouveau': return '반누보(두성)'; case 'tintoretto': return '틴토레토(삼원)';
+                case 'mermaid': return '머메이드(삼원)'; default: return type;
+                }
+            };
+
+            const getWeightOptions = (paperType) => {
+                const weights = Object.keys(PRICES.paper[paperType] || {});
+                return weights.map(w => <option key={w} value={w}>{w}</option>);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-100 text-gray-800">
+                
+                {/* 헤더 */}
+                <header className="bg-slate-900 text-white p-4 shadow-lg no-print sticky top-0 z-50">
+                    <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <CalculatorIcon className="w-6 h-6 text-yellow-400" />
+                        <h1 className="text-xl font-bold">조프로의 자동 견적 산출 시스템 (Pro)</h1>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={resetManualPrices} className="text-xs bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded flex items-center gap-1 transition">
+                            <RefreshCcw className="w-3 h-3"/> 용지단가 초기화
+                        </button>
+                        <div className="text-xs bg-slate-800 px-3 py-1.5 rounded-full text-gray-300 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                            보수적 계산 적용
+                        </div>
+                    </div>
+                    </div>
+                </header>
+
+                <main className="max-w-7xl mx-auto p-4 md:p-6 flex flex-col lg:flex-row gap-6">
+                    
+                    {/* 왼쪽: 설정 패널 */}
+                    <section className="lg:w-5/12 space-y-4 no-print h-[calc(100vh-100px)] overflow-y-auto pr-2 scrollbar-thin">
+                    
+                    {/* 1. 기본 정보 */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 mb-4 border-b pb-2">
+                        <Settings className="w-5 h-5 text-blue-600" /> 1. 기본 정보
+                        </h3>
+                        <div className="space-y-4">
+                        <div>
+                            <label className="text-sm font-bold text-gray-700">고객/업체명</label>
+                            <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+                            className="w-full p-2 border rounded mt-1" placeholder="견적서에 표시될 이름" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                            <label className="text-sm font-bold text-gray-700">인쇄 방식</label>
+                            <select value={printMethod} onChange={(e) => setPrintMethod(e.target.value)}
+                                className="w-full p-2 border rounded mt-1 bg-blue-50">
+                                <option value="offset">오프셋 인쇄</option>
+                                <option value="digital">디지털 POD</option>
+                            </select>
+                            </div>
+                            <div>
+                            <label className="text-sm font-bold text-gray-700">수량 (부)</label>
+                            <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))}
+                                className="w-full p-2 border rounded mt-1 text-right font-bold" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm font-bold text-gray-700">판형 (사이즈)</label>
+                            <div className="flex gap-2">
+                            <select value={sizeMode} onChange={(e) => setSizeMode(e.target.value)}
+                                className="w-full p-2 border rounded">
+                                <option value="A4">A4 (210 x 297)</option>
+                                <option value="A3">A3 (297 x 420)</option>
+                                <option value="A5">A5 (148 x 210)</option>
+                                <option value="B5">B5 (182 x 257)</option>
+                                <option value="custom">직접 입력</option>
+                            </select>
+                            {sizeMode === 'custom' && (
+                                <div className="flex gap-1 items-center">
+                                <input type="number" value={customSize.w} onChange={(e)=>setCustomSize({...customSize, w:e.target.value})} className="w-16 p-2 border rounded text-sm" placeholder="W"/>
+                                <span>x</span>
+                                <input type="number" value={customSize.h} onChange={(e)=>setCustomSize({...customSize, h:e.target.value})} className="w-16 p-2 border rounded text-sm" placeholder="H"/>
+                                </div>
+                            )}
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                    {/* 2. 표지 사양 */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 mb-4 border-b pb-2">
+                        <Layers className="w-5 h-5 text-blue-600" /> 2. 표지 사양
+                        </h3>
+                        <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <input type="checkbox" id="useCover" checked={cover.use} onChange={(e) => setCover({...cover, use: e.target.checked})} className="w-4 h-4" />
+                            <label htmlFor="useCover" className="font-medium">표지 별도 구성</label>
+                        </div>
+                        {cover.use && (
+                            <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded">
+                            <div className="col-span-2">
+                                <label className="text-xs text-gray-500 font-bold">표지 용지</label>
+                                <div className="flex gap-2">
+                                    <select value={cover.paperType} onChange={(e)=>setCover({...cover, paperType:e.target.value, paperWeight: '200g'})} className="border p-1 rounded text-sm flex-1">
+                                    <optgroup label="일반지">
+                                        <option value="art">아트지</option>
+                                        <option value="snow">스노우지</option>
+                                    </optgroup>
+                                    <optgroup label="고급/수입지">
+                                        <option value="rendezvous">랑데뷰</option>
+                                        <option value="montblanc">몽블랑</option>
+                                        <option value="van_nouveau">반누보</option>
+                                        <option value="tintoretto">틴토레토</option>
+                                        <option value="mermaid">머메이드</option>
+                                    </optgroup>
+                                    </select>
+                                    <select value={cover.paperWeight} onChange={(e)=>setCover({...cover, paperWeight:e.target.value})} className="border p-1 rounded text-sm w-24">
+                                    {getWeightOptions(cover.paperType)}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="col-span-1">
+                                <label className="text-xs text-gray-500 font-bold">인쇄 도수</label>
+                                <select value={cover.printColor} onChange={(e)=>setCover({...cover, printColor:e.target.value})} className="border p-1 rounded text-sm w-full">
+                                    <option value="color">컬러 (4도)</option>
+                                    <option value="bw">흑백 (1도)</option>
+                                    <option value="none">인쇄 없음</option>
+                                </select>
+                            </div>
+                            <div className="col-span-1">
+                                <label className="text-xs text-gray-500 font-bold">단/양면</label>
+                                <select value={cover.printSide} onChange={(e)=>setCover({...cover, printSide:e.target.value})} className="border p-1 rounded text-sm w-full">
+                                    <option value="single">단면 인쇄</option>
+                                    <option value="double">양면 인쇄</option>
+                                </select>
+                            </div>
+                            </div>
+                        )}
+                        </div>
+                    </div>
+
+                    {/* 3. 내지 사양 */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 mb-4 border-b pb-2">
+                        <Book className="w-5 h-5 text-blue-600" /> 3. 내지 사양
+                        </h3>
+                        <div className="space-y-3">
+                        <div>
+                            <label className="text-sm font-bold text-gray-700">페이지 수</label>
+                            <input type="number" value={inner.pages} onChange={(e)=>setInner({...inner, pages:Number(e.target.value)})} 
+                            className="w-full p-2 border rounded mt-1" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2">
+                            <label className="text-xs text-gray-500 font-bold">내지 용지</label>
+                            <div className="flex gap-2">
+                                <select value={inner.paperType} onChange={(e)=>setInner({...inner, paperType:e.target.value})} className="border p-2 rounded text-sm flex-1">
+                                    <optgroup label="일반지">
+                                    <option value="mojo">모조지 (서적)</option>
+                                    <option value="art">아트지</option>
+                                    <option value="snow">스노우지</option>
+                                    </optgroup>
+                                    <optgroup label="고급/수입지">
+                                    <option value="rendezvous">랑데뷰</option>
+                                    <option value="montblanc">몽블랑</option>
+                                    <option value="van_nouveau">반누보</option>
+                                    </optgroup>
+                                </select>
+                                <select value={inner.paperWeight} onChange={(e)=>setInner({...inner, paperWeight:e.target.value})} className="border p-2 rounded text-sm w-24">
+                                    {getWeightOptions(inner.paperType)}
+                                </select>
+                            </div>
+                            </div>
+                            <select value={inner.printColor} onChange={(e)=>setInner({...inner, printColor:e.target.value})} className="border p-2 rounded text-sm">
+                            <option value="bw">흑백 (1도)</option>
+                            <option value="color">컬러 (4도)</option>
+                            <option value="none">인쇄 없음</option>
+                            </select>
+                            <select value={inner.printSide} onChange={(e)=>setInner({...inner, printSide:e.target.value})} className="border p-2 rounded text-sm">
+                            <option value="double">양면</option>
+                            <option value="single">단면</option>
+                            </select>
+                        </div>
+                        </div>
+                    </div>
+
+                    {/* 4. 후가공 */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                        <h3 className="text-lg font-bold flex items-center gap-2 text-slate-800 mb-4 border-b pb-2">
+                        <Scissors className="w-5 h-5 text-blue-600" /> 4. 후가공 (제본/동판)
+                        </h3>
+                        <div className="space-y-4">
+                        <div>
+                            <label className="text-sm font-bold text-gray-700">코팅 (표지)</label>
+                            <select value={cover.coating} onChange={(e)=>setCover({...cover, coating:e.target.value})} className="w-full p-2 border rounded mt-1">
+                            <option value="none">없음</option><option value="glossy">유광 코팅</option><option value="matte">무광 코팅</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-sm font-bold text-gray-700">제본 방식</label>
+                            <select value={binding} onChange={(e)=>setBinding(e.target.value)} className="w-full p-2 border rounded mt-1">
+                            <option value="wireless">무선 제본 (책)</option><option value="saddle">중철 제본 (카탈로그)</option>
+                            <option value="ring">스프링 제본</option><option value="none">제본 안함</option>
+                            </select>
+                        </div>
+                        
+                        <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
+                            <label className="text-sm font-bold text-amber-800 mb-2 block">특수 가공 (동판비 발생)</label>
+                            <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={specialFinish.foil} onChange={(e)=>setSpecialFinish({...specialFinish, foil:e.target.checked})} className="w-4 h-4 text-amber-600"/>
+                                <span className="text-sm">박 (Gold/Silver)</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={specialFinish.emboss} onChange={(e)=>setSpecialFinish({...specialFinish, emboss:e.target.checked})} className="w-4 h-4 text-amber-600"/>
+                                <span className="text-sm">형압 (Embossing)</span>
+                            </label>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    </section>
+
+
+                    {/* 오른쪽: 견적서 미리보기 */}
+                    <section className="lg:w-7/12">
+                    <div className="sticky top-20">
+                        <div className="invoice-container bg-white p-8 border border-gray-300 shadow-xl min-h-[800px] flex flex-col relative">
+                        
+                        {/* 워터마크 (선택사항) */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
+                            <Printer size={400} />
+                        </div>
+
+                        {/* 상단 정보 */}
+                        <div className="relative z-10">
+                            <div className="border-b-4 border-double border-slate-800 pb-4 mb-8 flex justify-between items-end">
+                            <div>
+                                <h1 className="text-4xl font-bold text-slate-900 tracking-widest">견 적 서</h1>
+                                <p className="text-sm text-gray-600 mt-2 font-bold">ESTIMATE SHEET</p>
+                            </div>
+                            <div className="text-right">
+                                <table className="text-xs text-center border-collapse border border-gray-400">
+                                <tbody>
+                                    <tr>
+                                    <td className="border border-gray-400 bg-gray-100 p-1 w-16">담당</td>
+                                    <td className="border border-gray-400 bg-gray-100 p-1 w-16">팀장</td>
+                                    <td className="border border-gray-400 bg-gray-100 p-1 w-16">대표</td>
+                                    </tr>
+                                    <tr>
+                                    <td className="border border-gray-400 h-12 align-middle"></td>
+                                    <td className="border border-gray-400 h-12 align-middle"></td>
+                                    <td className="border border-gray-400 h-12 align-middle"><span className="text-red-600 opacity-70 text-xs">(인)</span></td>
+                                    </tr>
+                                </tbody>
+                                </table>
+                            </div>
+                            </div>
+
+                            <div className="flex justify-between mb-8 text-sm">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                <span className="w-16 font-bold text-slate-700">수 신 :</span>
+                                <span className="text-lg font-bold border-b border-gray-400 px-2 min-w-[200px]">{customerName} 귀하</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                <span className="w-16 font-bold text-slate-700">참 조 :</span>
+                                <span>-</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                <span className="w-16 font-bold text-slate-700">날 짜 :</span>
+                                <span>{today}</span>
+                                </div>
+                            </div>
+                            <div className="text-right space-y-1">
+                                <div className="font-bold text-lg">조프로 인쇄소</div>
+                                <div className="text-gray-600">등록번호 : 123-45-67890</div>
+                                <div className="text-gray-600">대표 : 제프로</div>
+                                <div className="text-gray-600">주소 : 서울시 인터넷구 데이터동</div>
+                            </div>
+                            </div>
+
+                            <div className="mb-4 p-2 bg-slate-100 border-l-4 border-slate-600 text-sm flex justify-between items-center">
+                            <div>
+                                <strong>제작 사양:</strong> {estimate.sizeText} / {inner.pages}p ({estimate.reamDetails.signatures}대) / {quantity}부
+                            </div>
+                            <div className="text-xs text-blue-600 flex items-center gap-1 no-print">
+                                <Info className="w-3 h-3"/> 파란 점선 단가는 클릭하여 수정 가능
+                            </div>
+                            </div>
+
+                            {/* 견적 상세 테이블 */}
+                            <table className="w-full text-sm border-t-2 border-slate-800 mb-8">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                <th className="py-2 px-2 border-b border-gray-300 w-10 text-center">No</th>
+                                <th className="py-2 px-2 border-b border-gray-300 text-left w-28">품 목</th>
+                                <th className="py-2 px-2 border-b border-gray-300 text-left">규격 / 내용</th>
+                                <th className="py-2 px-2 border-b border-gray-300 text-right w-24">수량</th>
+                                <th className="py-2 px-2 border-b border-gray-300 text-right w-28">단가</th>
+                                <th className="py-2 px-2 border-b border-gray-300 text-right w-28">공급가액</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {/* 1. 표지 용지대 (수정 가능) */}
+                                {cover.use && (
+                                <tr>
+                                    <td className="py-3 text-center text-gray-500">1</td>
+                                    <td className="py-3 font-bold text-slate-700">표지 용지대</td>
+                                    <td className="py-3 text-gray-600 text-xs">
+                                    {getPaperName(cover.paperType)} {cover.paperWeight}<br/>
+                                    <span className="text-slate-500 text-[10px]">
+                                        (정미{estimate.reamDetails.cover.net.toFixed(2)} + 여분{estimate.reamDetails.cover.loss.toFixed(2)}R)
+                                    </span>
+                                    </td>
+                                    <td className="py-3 text-right">
+                                        {estimate.items.coverPaper.qty} {estimate.items.coverPaper.unit}
+                                    </td>
+                                    <td className="py-3 text-right px-1">
+                                    <input 
+                                        type="number" 
+                                        className="editable-input" 
+                                        value={estimate.items.coverPaper.finalPrice}
+                                        onChange={(e) => handlePriceChange('coverPaper', e.target.value)}
+                                    />
+                                    </td>
+                                    <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.coverPaper.amount)}</td>
+                                </tr>
+                                )}
+
+                                {/* 2. 내지 용지대 (수정 가능) */}
+                                <tr>
+                                <td className="py-3 text-center text-gray-500">{cover.use ? 2 : 1}</td>
+                                <td className="py-3 font-bold text-slate-700">내지 용지대</td>
+                                <td className="py-3 text-gray-600 text-xs">
+                                    {getPaperName(inner.paperType)} {inner.paperWeight}<br/>
+                                    <span className="text-slate-500 text-[10px]">
+                                        (정미{estimate.reamDetails.inner.net.toFixed(2)} + 여분{estimate.reamDetails.inner.loss.toFixed(2)}R)
+                                    </span>
+                                </td>
+                                <td className="py-3 text-right">
+                                    {estimate.items.innerPaper.qty} {estimate.items.innerPaper.unit}
+                                </td>
+                                <td className="py-3 text-right px-1">
+                                    <input 
+                                        type="number" 
+                                        className="editable-input" 
+                                        value={estimate.items.innerPaper.finalPrice}
+                                        onChange={(e) => handlePriceChange('innerPaper', e.target.value)}
+                                    />
+                                </td>
+                                <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.innerPaper.amount)}</td>
+                                </tr>
+
+                                {/* 3. CTP (수정 불가) */}
+                                <tr>
+                                <td className="py-3 text-center text-gray-500">{cover.use ? 3 : 2}</td>
+                                <td className="py-3 font-bold text-slate-700">인쇄판비 (CTP)</td>
+                                <td className="py-3 text-gray-600 text-xs">
+                                    {printMethod === 'offset' ? <>CTP 출력 ({estimate.items.ctp.qty}판)</> : <>디지털 데이터 처리비</>}
+                                </td>
+                                <td className="py-3 text-right">{estimate.items.ctp.qty} {estimate.items.ctp.unit}</td>
+                                <td className="py-3 text-right text-gray-600">{formatCurrency(estimate.items.ctp.finalPrice)}</td>
+                                <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.ctp.amount)}</td>
+                                </tr>
+
+                                {/* 4. 표지 인쇄비 (수정 불가) */}
+                                {cover.use && (
+                                <tr>
+                                    <td className="py-3 text-center text-gray-500">{cover.use ? 4 : 3}</td>
+                                    <td className="py-3 font-bold text-slate-700">표지 인쇄비</td>
+                                    <td className="py-3 text-gray-600 text-xs">
+                                    {cover.printColor === 'color' ? '4도' : cover.printColor === 'bw' ? '1도' : '인쇄 없음'}
+                                    </td>
+                                    <td className="py-3 text-right">{estimate.items.coverPrint.qty} {estimate.items.coverPrint.unit}</td>
+                                    <td className="py-3 text-right text-gray-600">
+                                    {cover.printColor !== 'none' ? formatCurrency(estimate.items.coverPrint.finalPrice) : '-'}
+                                    </td>
+                                    <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.coverPrint.amount)}</td>
+                                </tr>
+                                )}
+
+                                {/* 5. 내지 인쇄비 (수정 불가) */}
+                                <tr>
+                                <td className="py-3 text-center text-gray-500">{cover.use ? 5 : 4}</td>
+                                <td className="py-3 font-bold text-slate-700">내지 인쇄비</td>
+                                <td className="py-3 text-gray-600 text-xs">
+                                    {inner.printColor === 'color' ? '4도' : inner.printColor === 'bw' ? '1도' : '인쇄 없음'}
+                                </td>
+                                <td className="py-3 text-right">{estimate.items.innerPrint.qty} {estimate.items.innerPrint.unit}</td>
+                                <td className="py-3 text-right text-gray-600">
+                                    {inner.printColor !== 'none' ? formatCurrency(estimate.items.innerPrint.finalPrice) : '-'}
+                                </td>
+                                <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.innerPrint.amount)}</td>
+                                </tr>
+
+                                {/* 6. 코팅비 (수정 불가) */}
+                                {cover.coating !== 'none' && (
+                                <tr>
+                                    <td className="py-3 text-center text-gray-500">{cover.use ? 6 : 5}</td>
+                                    <td className="py-3 font-bold text-slate-700">코팅비 (Coating)</td>
+                                    <td className="py-3 text-gray-600 text-xs">
+                                    {cover.coating === 'glossy' ? '유광' : '무광'} 라미네이팅
+                                    </td>
+                                    <td className="py-3 text-right">{estimate.items.coating.qty} {estimate.items.coating.unit}</td>
+                                    <td className="py-3 text-right text-gray-600">{formatCurrency(estimate.items.coating.finalPrice)}</td>
+                                    <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.coating.amount)}</td>
+                                </tr>
+                                )}
+
+                                {/* 7. 제본비 (수정 불가) */}
+                                {binding !== 'none' && (
+                                <tr>
+                                    <td className="py-3 text-center text-gray-500">
+                                    {cover.coating !== 'none' ? (cover.use ? 7 : 6) : (cover.use ? 6 : 5)}
+                                    </td>
+                                    <td className="py-3 font-bold text-slate-700">제본비 (Binding)</td>
+                                    <td className="py-3 text-gray-600 text-xs">
+                                    {binding === 'wireless' ? '무선 제본' : binding === 'saddle' ? '중철 제본' : '스프링 제본'}
+                                    </td>
+                                    <td className="py-3 text-right">{estimate.items.binding.qty} {estimate.items.binding.unit}</td>
+                                    <td className="py-3 text-right text-gray-600">{formatCurrency(estimate.items.binding.finalPrice)}</td>
+                                    <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.binding.amount)}</td>
+                                </tr>
+                                )}
+
+                                {/* 8. 특수후가공 (수정 불가) */}
+                                {(specialFinish.foil || specialFinish.emboss) && (
+                                <tr>
+                                    <td className="py-3 text-center text-gray-500">8</td>
+                                    <td className="py-3 font-bold text-slate-700">특수 후가공</td>
+                                    <td className="py-3 text-gray-600 text-xs">
+                                    {specialFinish.foil && "박 가공 (동판포함)"} 
+                                    {specialFinish.foil && specialFinish.emboss && " / "}
+                                    {specialFinish.emboss && "형압 가공"}
+                                    </td>
+                                    <td className="py-3 text-right">{estimate.items.special.qty} {estimate.items.special.unit}</td>
+                                    <td className="py-3 text-right text-gray-600">{formatCurrency(estimate.items.special.finalPrice)}</td>
+                                    <td className="py-3 text-right font-medium">{formatCurrency(estimate.items.special.amount)}</td>
+                                </tr>
+                                )}
+                            </tbody>
+                            
+                            <tfoot className="border-t-2 border-gray-300">
+                                <tr className="bg-blue-50">
+                                <td colSpan="5" className="py-2 px-4 text-right font-bold text-slate-600">일반관리비 (5%)</td>
+                                <td className="py-2 px-2 text-right font-bold text-slate-600">{formatCurrency(estimate.generalMgmtFee)}</td>
+                                </tr>
+                            </tfoot>
+                            </table>
+
+                            {/* 최종 금액 박스 */}
+                            <div className="flex justify-end mt-4">
+                            <div className="w-full md:w-1/2 bg-white p-4 border border-slate-900 rounded-sm">
+                                <div className="flex justify-between mb-2">
+                                <span className="text-gray-600">공급가액</span>
+                                <span className="font-bold">{formatCurrency(estimate.subTotal)} 원</span>
+                                </div>
+                                <div className="flex justify-between mb-4 border-b pb-2">
+                                <span className="text-gray-600">부가세 (VAT)</span>
+                                <span className="font-bold">{formatCurrency(estimate.vat)} 원</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xl text-slate-900">
+                                <span className="font-bold tracking-tight">총 합계금액</span>
+                                <span className="font-black text-2xl text-blue-800">{formatCurrency(estimate.total)} 원</span>
+                                </div>
+                            </div>
+                            </div>
+                            
+                            <div className="mt-12 text-center text-xs text-gray-400 no-print">
+                            * 본 견적서의 파란색 점선으로 표시된 단가는 사용자가 수정한 금액일 수 있습니다.<br/>
+                            * 유효기간: 발행일로부터 15일
+                            </div>
+                        </div>
+                        </div>
+
+                        <div className="mt-4 flex gap-2 no-print">
+                        <button onClick={() => window.print()} className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-bold shadow-xl hover:bg-black transition flex items-center justify-center gap-2">
+                            <FileText className="w-5 h-5" /> 견적서 출력하기
+                        </button>
+                        </div>
+                    </div>
+                    </section>
+                </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<PrintingQuoteCalculator />);
+    </script>
+</body>
+</html>
